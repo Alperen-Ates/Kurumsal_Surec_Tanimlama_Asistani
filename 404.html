@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kurumsal Dijital Platform</title>
+    
+    <!-- STİL -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' },
+                        dark: { 800: '#1e293b', 900: '#0f172a' }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- REACT & FIREBASE -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body { background-color: #F8FAFC; -webkit-tap-highlight-color: transparent; }
+        
+        /* Modern Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+        
+        /* Tooltip Fix - Üstte Kalma Sorunu Çözüldü */
+        .tooltip-container {
+            z-index: 9999 !important; 
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            min-width: 200px;
+        }
+
+        /* Kart Efektleri */
+        .hover-card { transition: all 0.3s ease; }
+        .hover-card:hover { transform: translateY(-4px); box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1); }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .print-area { width: 100%; margin: 0; padding: 0; }
+            table { width: 100% !important; border-collapse: collapse; font-size: 10px; border: 1px solid #eee; }
+            th, td { border: 1px solid #000 !important; padding: 4px !important; }
+            aside, header, .card-view, .modal-overlay { display: none !important; }
+        }
+        .fixed-table { table-layout: fixed; width: 100%; }
+        .wrap-text { word-wrap: break-word; white-space: pre-wrap; }
+        
+        /* Onaylanmış satır stili */
+        .status-approved { background-color: #F0FDF4 !important; border-left: 4px solid #22C55E !important; }
+        
+        /* Animasyonlar */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // =================================================================
+        // 🔥 FIREBASE AYARLARI
+        // =================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAzF-qtvwK0gszwNupyLC0_Fv2YNZtrMB4",
+            authDomain: "kurumsal-asistan.firebaseapp.com",
+            projectId: "kurumsal-asistan",
+            storageBucket: "kurumsal-asistan.firebasestorage.app",
+            messagingSenderId: "1091801269872",
+            appId: "1:1091801269872:web:dfc5f6feec7771a85cd6b5",
+            measurementId: "G-Z9ES2MSV2Z"
+        };
+
+        // --- GÜVENLİ BAŞLATMA ---
+        let db = null;
+        let sysError = null;
+
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            db = firebase.firestore();
+            console.log("Firebase bağlantısı başarılı.");
+        } catch (e) {
+            console.error("Firebase Hatası:", e);
+            sysError = "Veritabanı bağlantısı kurulamadı. Lütfen internet bağlantınızı kontrol edin.";
+        }
+
+        const { useState, useEffect } = React;
+
+        // --- İKON SETİ ---
+        const Icons = {
+            Logo: () => <svg className="w-6 h-6 md:w-8 md:h-8 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>,
+            Dashboard: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+            Users: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+            List: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>,
+            Bug: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+            Plus: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>,
+            Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+            LogOut: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>,
+            Building: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+            Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+            Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>,
+            Close: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>,
+            Question: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            Folder: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>,
+            ArrowLeft: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+        };
+
+        // --- YARDIMCI BİLEŞENLER ---
+
+        const InfoCard = ({ title, value, color, icon, desc }) => {
+            const [showTooltip, setShowTooltip] = useState(false);
+            return (
+                <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative hover:shadow-md transition-all duration-300`}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h3 className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">{title}</h3>
+                            <p className="text-3xl font-bold text-slate-800">{value}</p>
+                        </div>
+                        <div className={`p-2 rounded-lg ${color} bg-opacity-10 text-opacity-100`}>{icon}</div>
+                    </div>
+                    {desc && (
+                        <div className="absolute top-3 right-3 cursor-help">
+                            <button 
+                                onClick={() => setShowTooltip(!showTooltip)} 
+                                onBlur={() => setTimeout(() => setShowTooltip(false), 200)} 
+                                className="text-slate-300 hover:text-blue-500 transition-colors focus:outline-none"
+                            >
+                                <Icons.Question />
+                            </button>
+                            {showTooltip && (
+                                <div className="tooltip-container p-3 text-xs text-white bg-slate-800 rounded-xl shadow-xl border border-slate-700 animate-fade-in">
+                                    {desc}
+                                    <div className="absolute top-0 right-2 -translate-y-full w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-b-4 border-b-slate-800"></div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- LOGIN EKRANI ---
+        const LoginScreen = ({ onLogin }) => {
+            const [username, setUsername] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                const success = await onLogin(username, password);
+                if (!success) setError("Kullanıcı adı veya şifre hatalı!");
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col lg:flex-row bg-white">
+                    <div className="lg:w-1/2 bg-brand-600 relative overflow-hidden flex items-center justify-center p-8 lg:p-12 h-48 lg:h-auto">
+                        <div className="absolute inset-0 bg-gradient-to-br from-brand-600 to-brand-900 opacity-90"></div>
+                        <div className="relative z-10 text-white text-center lg:text-left">
+                            <h1 className="text-2xl lg:text-5xl font-extrabold mb-2 lg:mb-6 leading-tight">Kurumsal Platform</h1>
+                            <p className="text-blue-100 text-sm lg:text-lg hidden lg:block">Dijital dönüşüm süreçlerinizi tek bir noktadan yönetin.</p>
+                        </div>
+                    </div>
+                    <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-6 lg:p-12 flex-1">
+                        <div className="w-full max-w-md space-y-8">
+                            <div className="text-center"><h2 className="text-2xl lg:text-3xl font-bold text-slate-900">Giriş Yap</h2><p className="mt-2 text-sm text-slate-500">Hesap bilgilerinizi giriniz</p></div>
+                            <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+                                <div className="space-y-4">
+                                    <div><label className="block text-sm font-medium text-slate-700 mb-1">Kullanıcı Adı</label><input type="text" required value={username} onChange={e => setUsername(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Örn: ahmet" /></div>
+                                    <div><label className="block text-sm font-medium text-slate-700 mb-1">Şifre</label><input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none" placeholder="••••••••" /></div>
+                                </div>
+                                {error && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg font-medium">{error}</div>}
+                                <button type="submit" disabled={loading} className="w-full py-3.5 px-4 bg-brand-600 text-white rounded-xl font-bold hover:bg-brand-700 transition-all shadow-lg disabled:opacity-70">{loading ? 'Giriş Yapılıyor...' : 'Giriş Yap'}</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- ADMİN PANELİ (Süreç Bazlı + Onay + Modern Kartlar) ---
+        const AdminDashboard = ({ users, processHeaders, processSteps, feedbacks, departments, onAddUser, onDeleteUser, onUpdateUser, onAddDept, onDeleteDept, onUpdateFeedback, onDeleteFeedback, onUpdateProcessStep }) => {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [filterDept, setFilterDept] = useState('Tümü');
+            const [newDeptName, setNewDeptName] = useState('');
+            const [newUser, setNewUser] = useState({ name:'', username:'', password:'', dept:'' });
+            const [editingUser, setEditingUser] = useState(null);
+            const [expandedProcessId, setExpandedProcessId] = useState(null);
+
+            const stats = {
+                users: users.filter(u=>u.role!=='admin').length,
+                totalSteps: processSteps.length,
+                totalProcesses: processHeaders.length,
+                pending: feedbacks.filter(f=>f.status==='Bekliyor').length,
+                depts: departments.length
+            };
+
+            const handleUpdateUser = () => {
+                if(!editingUser.name || !editingUser.username || !editingUser.password) return alert("Bilgiler boş olamaz.");
+                onUpdateUser(editingUser.id, { name: editingUser.name, username: editingUser.username, password: editingUser.password, dept: editingUser.dept });
+                setEditingUser(null);
+            };
+
+            const handleApproveStep = (id) => {
+                if(confirm("Bu adımı onaylıyor musunuz?")) onUpdateProcessStep(id, { status: 'Onaylandı' });
+            };
+
+            return (
+                <div className="flex flex-col h-full bg-[#F8FAFC]">
+                    <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 lg:px-8 py-3 flex gap-4 overflow-x-auto no-print sticky top-0 z-20">
+                         {['dashboard', 'users', 'processes', 'feedbacks'].map(tab => (
+                            <button key={tab} onClick={()=>setActiveTab(tab)} className={`whitespace-nowrap px-3 py-2 text-sm font-medium rounded-lg transition-colors ${activeTab===tab ? 'bg-brand-50 text-brand-600' : 'text-slate-500 hover:text-slate-800'}`}>
+                                {tab === 'dashboard' ? 'Özet' : tab === 'users' ? 'Organizasyon' : tab === 'processes' ? 'Süreçler' : 'Bildirimler'}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 lg:p-8">
+                         {activeTab === 'dashboard' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-in">
+                                <InfoCard title="PERSONEL" value={stats.users} color="text-blue-600 bg-blue-600" icon={<Icons.Users/>} desc="Sistemde kayıtlı toplam personel." />
+                                <InfoCard title="SÜREÇ BAŞLIĞI" value={stats.totalProcesses} color="text-green-600 bg-green-600" icon={<Icons.Folder/>} desc="Oluşturulan toplam süreç başlığı sayısı." />
+                                <InfoCard title="TOPLAM ADIM" value={stats.totalSteps} color="text-indigo-600 bg-indigo-600" icon={<Icons.List/>} desc="Tüm süreçlerdeki toplam alt adım sayısı." />
+                                <InfoCard title="BİLDİRİM" value={stats.pending} color="text-red-600 bg-red-600" icon={<Icons.Bug/>} desc="Bekleyen bildirimler." />
+                            </div>
+                        )}
+                        
+                        {/* USERS TAB (MODERN KARTLAR GERİ GELDİ) */}
+                        {activeTab === 'users' && (
+                            <div className="space-y-8 animate-fade-in">
+                                {/* Departmanlar */}
+                                <section>
+                                    <div className="flex justify-between items-end mb-6">
+                                        <div><h3 className="text-xl font-bold text-slate-800">Departmanlar</h3><p className="text-sm text-slate-500">Kurumsal birimler</p></div>
+                                        <button onClick={()=>{const d = prompt("Yeni Departman Adı:"); if(d) onAddDept(d)}} className="bg-brand-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-brand-200 hover:bg-brand-700 transition-all flex items-center gap-2"><Icons.Plus /> Yeni Ekle</button>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        {departments.map(d => (
+                                            <div key={d.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-brand-200 transition-all relative group overflow-hidden">
+                                                <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-brand-50 to-transparent opacity-50 rounded-bl-full -mr-4 -mt-4"></div>
+                                                <div className="relative z-10">
+                                                    <div className="flex justify-between items-start mb-4">
+                                                        <div className="p-3 bg-brand-50 text-brand-600 rounded-xl"><Icons.Building /></div>
+                                                        <button onClick={()=>{if(confirm(d.name + " silinsin mi?")) onDeleteDept(d.id)}} className="text-slate-300 hover:text-red-500 transition-colors p-1 opacity-0 group-hover:opacity-100"><Icons.Trash /></button>
+                                                    </div>
+                                                    <h4 className="text-lg font-bold text-slate-800 mb-1">{d.name}</h4>
+                                                    <div className="flex items-center gap-2 text-xs text-slate-500 font-medium"><Icons.Users /> <span>{users.filter(u => u.dept === d.name).length} Personel</span></div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                {/* Personel Yönetimi */}
+                                <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                    {/* Personel Ekleme */}
+                                    <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 h-fit sticky top-24">
+                                        <h3 className="font-bold text-lg mb-4 text-slate-800 border-b pb-2">Personel Kaydı</h3>
+                                        <div className="space-y-3">
+                                            <input value={newUser.name} onChange={e=>setNewUser({...newUser, name:e.target.value})} className="w-full border p-3 rounded-xl text-sm bg-slate-50" placeholder="Ad Soyad" />
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <input value={newUser.username} onChange={e=>setNewUser({...newUser, username:e.target.value})} className="w-full border p-3 rounded-xl text-sm bg-slate-50" placeholder="Kullanıcı Adı" />
+                                                <input value={newUser.password} onChange={e=>setNewUser({...newUser, password:e.target.value})} className="w-full border p-3 rounded-xl text-sm bg-slate-50" placeholder="Şifre" />
+                                            </div>
+                                            <div className="relative">
+                                                <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Departman</label>
+                                                <select value={newUser.dept} onChange={e=>setNewUser({...newUser, dept:e.target.value})} className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white focus:ring-2 focus:ring-brand-500 outline-none appearance-none">
+                                                    <option value="">Seçiniz...</option>
+                                                    {departments.map((d) => (<option key={d.id} value={d.name}>{d.name}</option>))}
+                                                </select>
+                                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 pt-6 text-slate-500"><svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg></div>
+                                            </div>
+                                            <button onClick={()=>{
+                                                if(!newUser.name || !newUser.username || !newUser.dept) return alert("Lütfen tüm alanları doldurun.");
+                                                onAddUser(newUser); 
+                                                setNewUser({name:'', username:'', password:'', dept:''});
+                                            }} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-transform active:scale-95">Kaydet</button>
+                                        </div>
+                                    </div>
+
+                                    {/* Personel Listesi */}
+                                    <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                                        <h3 className="font-bold text-lg mb-4 text-slate-800 border-b pb-2">Personel Listesi</h3>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-sm">
+                                                <thead className="bg-slate-50 text-slate-500 font-medium"><tr><th className="p-4">Ad</th><th className="p-4">K.Adı</th><th className="p-4">Dept</th><th className="p-4">Şifre</th><th className="p-4 text-right">İşlem</th></tr></thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {users.filter(u=>u.role!=='admin').map(u=>(
+                                                        <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                                                            <td className="p-4 font-medium">{u.name}</td>
+                                                            <td className="p-4 text-slate-500">{u.username}</td>
+                                                            <td className="p-4"><span className="px-2 py-1 bg-slate-100 rounded text-xs">{u.dept}</span></td>
+                                                            <td className="p-4 font-mono text-xs">{u.password}</td>
+                                                            <td className="p-4 text-right flex justify-end gap-2">
+                                                                <button onClick={()=>setEditingUser({...u})} className="text-blue-400 bg-blue-50 p-2 rounded hover:bg-blue-100"><Icons.Edit/></button>
+                                                                <button onClick={()=>{if(confirm("Silinsin mi?")) onDeleteUser(u.id)}} className="text-red-400 bg-red-50 p-2 rounded hover:bg-red-100"><Icons.Trash/></button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </section>
+                            </div>
+                        )}
+
+                        {/* Edit User Modal */}
+                        {editingUser && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
+                                    <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">Düzenle</h3><button onClick={()=>setEditingUser(null)}><Icons.Close/></button></div>
+                                    <div className="space-y-4">
+                                        <input value={editingUser.name} onChange={e=>setEditingUser({...editingUser, name:e.target.value})} className="w-full border p-3 rounded-xl" placeholder="Ad" />
+                                        <input value={editingUser.username} onChange={e=>setEditingUser({...editingUser, username:e.target.value})} className="w-full border p-3 rounded-xl" placeholder="Kullanıcı Adı" />
+                                        <input value={editingUser.password} onChange={e=>setEditingUser({...editingUser, password:e.target.value})} className="w-full border p-3 rounded-xl" placeholder="Şifre" />
+                                        <select value={editingUser.dept} onChange={e=>setEditingUser({...editingUser, dept:e.target.value})} className="w-full border p-3 rounded-xl bg-white">{departments.map(d=><option key={d.id} value={d.name}>{d.name}</option>)}</select>
+                                        <button onClick={handleUpdateUser} className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold">Kaydet</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* PROCESSES TAB - HİYERARŞİK + ONAYLAMA */}
+                        {activeTab === 'processes' && (
+                            <div className="space-y-6 animate-fade-in">
+                                <div className="flex justify-between items-center no-print">
+                                    <h3 className="font-bold text-xl text-slate-800">Tüm Şirket Süreçleri</h3>
+                                    <button onClick={()=>window.print()} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold">Rapor Al</button>
+                                </div>
+                                
+                                {processHeaders.length === 0 ? <div className="text-center text-gray-400 py-20">Henüz süreç girişi yapılmamış.</div> : 
+                                processHeaders.map(ph => (
+                                    <div key={ph.id} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                                        <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => setExpandedProcessId(expandedProcessId === ph.id ? null : ph.id)}>
+                                            <div className="flex items-center gap-4">
+                                                <div className="bg-blue-100 text-blue-600 p-2 rounded-lg"><Icons.Folder /></div>
+                                                <div>
+                                                    <h4 className="font-bold text-slate-800">{ph.title}</h4>
+                                                    <p className="text-xs text-slate-500">{ph.dept} | {ph.createdBy}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-xs font-bold bg-white px-2 py-1 rounded border text-slate-500">{processSteps.filter(s => s.processId === ph.id).length} Adım</span>
+                                                <svg className={`w-5 h-5 text-slate-400 transform transition-transform ${expandedProcessId === ph.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                                            </div>
+                                        </div>
+
+                                        {expandedProcessId === ph.id && (
+                                            <div className="p-4 bg-white animate-fade-in">
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-xs border-collapse">
+                                                        <thead className="bg-slate-50 text-slate-500 uppercase font-bold">
+                                                            <tr>
+                                                                <th className="p-3 border-b w-10">#</th>
+                                                                <th className="p-3 border-b">Aksiyon</th>
+                                                                <th className="p-3 border-b">Tetikleyici</th>
+                                                                <th className="p-3 border-b">Sistem</th>
+                                                                <th className="p-3 border-b">Risk</th>
+                                                                <th className="p-3 border-b">Durum</th>
+                                                                <th className="p-3 border-b no-print">İşlem</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {processSteps.filter(s => s.processId === ph.id).map((step, index) => (
+                                                                <tr key={step.id} className={`hover:bg-blue-50/50 ${step.status === 'Onaylandı' ? 'status-approved' : ''}`}>
+                                                                    <td className="p-3 border-b text-center text-slate-400">{index + 1}</td>
+                                                                    <td className="p-3 border-b font-medium text-slate-700 wrap-text max-w-md">{step.action}</td>
+                                                                    <td className="p-3 border-b text-slate-500">{step.trigger}</td>
+                                                                    <td className="p-3 border-b">{step.system}</td>
+                                                                    <td className="p-3 border-b text-red-500 wrap-text max-w-xs">{step.mistakes}</td>
+                                                                    <td className="p-3 border-b">
+                                                                        {step.status === 'Onaylandı' ? 
+                                                                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold flex items-center gap-1 w-fit"><Icons.Check/> Onaylı</span> : 
+                                                                            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold w-fit">Bekliyor</span>
+                                                                        }
+                                                                    </td>
+                                                                    <td className="p-3 border-b no-print">
+                                                                        {step.status !== 'Onaylandı' && <button onClick={()=>handleApproveStep(step.id)} className="bg-green-500 text-white px-2 py-1 rounded text-xs font-bold hover:bg-green-600">Onayla</button>}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* FEEDBACKS TAB */}
+                        {activeTab === 'feedbacks' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-fade-in">
+                                {feedbacks.map(f => (
+                                    <div key={f.id} className={`bg-white rounded-xl p-5 border-l-4 shadow-sm relative ${f.priority === 'Kritik' ? 'border-l-red-500' : f.priority === 'Yüksek' ? 'border-l-orange-500' : 'border-l-blue-500'}`}>
+                                        <div className="flex justify-between mb-2">
+                                            <span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded text-slate-600">{f.type}</span>
+                                            <span className={`text-xs font-bold px-2 py-1 rounded ${f.status==='Bekliyor'?'bg-yellow-100 text-yellow-700':'bg-green-100 text-green-700'}`}>{f.status}</span>
+                                        </div>
+                                        <h4 className="font-bold text-slate-800">{f.subject}</h4>
+                                        <p className="text-xs text-slate-500 mt-1 line-clamp-3">{f.desc}</p>
+                                        <div className="mt-4 pt-3 border-t flex justify-between items-center">
+                                            <div className="text-xs"><span className="font-bold block text-slate-700">{f.reporter}</span><span className="text-slate-400">{f.dept}</span></div>
+                                            <div className="flex gap-2">
+                                                {f.status!=='Tamamlandı' && <button onClick={()=>onUpdateFeedback(f.id, f.status==='Bekliyor'?'İnceleniyor':'Tamamlandı')} className="text-xs bg-slate-900 text-white px-3 py-1 rounded hover:bg-slate-700">Kapat</button>}
+                                                <button onClick={()=>{if(confirm("Silinsin mi?")) onDeleteFeedback(f.id)}} className="text-red-500 bg-red-50 p-1.5 rounded"><Icons.Trash/></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- EMPLOYEE DASHBOARD (Süreç Bazlı - Yenilenmiş) ---
+        const EmployeeDashboard = ({ currentUser, onAddProcessHeader, onAddProcessStep, onAddFeedback, processHeaders, processSteps, userFeedbacks, onDeleteProcessStep, onDeleteProcessHeader }) => {
+            const [activeTab, setActiveTab] = useState('processes');
+            const [viewMode, setViewMode] = useState('list'); // list | create | detail
+            const [currentProcess, setCurrentProcess] = useState(null); // Seçili süreç başlığı
+
+            // Form States
+            const [headerTitle, setHeaderTitle] = useState('');
+            const [stepForm, setStepForm] = useState({ trigger: '', action: '', system: '', inputs: '', outputs: '', duration: '', frequency: '', decision: '', rules: '', knowledge: '', mistakes: '' });
+            const [fForm, setFForm] = useState({ type: 'İyileştirme', subject: '', desc: '', priority: 'Orta', impact: 'Zaman' });
+
+            // Yeni Süreç Başlığı Ekle
+            const handleCreateProcess = () => {
+                if(!headerTitle) return alert("Süreç başlığı giriniz.");
+                const newHeader = {
+                    title: headerTitle,
+                    dept: currentUser.dept,
+                    createdBy: currentUser.name,
+                    userId: currentUser.id,
+                    createdAt: new Date().toISOString()
+                };
+                onAddProcessHeader(newHeader);
+                setHeaderTitle('');
+                setViewMode('list');
+            };
+
+            // Adım Ekle
+            const handleAddStep = () => {
+                if(!stepForm.action) return alert("Aksiyon alanı zorunludur.");
+                const newStep = {
+                    ...stepForm,
+                    processId: currentProcess.id,
+                    userId: currentUser.id,
+                    status: 'Bekliyor',
+                    createdAt: new Date().toISOString()
+                };
+                onAddProcessStep(newStep);
+                setStepForm(prev => ({ ...prev, action:'', inputs:'', outputs:'', duration:'', decision:'', rules:'', knowledge:'', mistakes:'' })); // Sistem ve Tetikleyiciyi koru
+            };
+
+            const handleFeedbackSubmit = () => {
+                if(!fForm.subject) return alert("Konu gerekli.");
+                onAddFeedback({ ...fForm, reporter: currentUser.name, dept: currentUser.dept });
+                setFForm({ type:'İyileştirme', subject:'', desc:'', priority:'Orta', impact:'Zaman' });
+                alert("Gönderildi!");
+            };
+
+            return (
+                <div className="flex flex-col h-full bg-[#F8FAFC]">
+                     <div className="bg-white border-b border-slate-200 px-4 py-3 flex gap-4 sticky top-0 z-20">
+                         <button onClick={()=>{setActiveTab('processes'); setViewMode('list')}} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab==='processes'?'bg-brand-50 text-brand-600':'text-slate-500 hover:bg-slate-50'}`}>Süreçlerim</button>
+                         <button onClick={()=>setActiveTab('feedback')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors ${activeTab==='feedback'?'bg-brand-50 text-brand-600':'text-slate-500 hover:bg-slate-50'}`}>Bildirimler</button>
+                     </div>
+
+                     <div className="flex-1 overflow-y-auto p-4 lg:p-8">
+                        
+                        {/* SÜREÇ YÖNETİMİ */}
+                        {activeTab === 'processes' && (
+                            <>
+                                {/* LİSTE GÖRÜNÜMÜ */}
+                                {viewMode === 'list' && (
+                                    <div className="animate-fade-in">
+                                        <div className="flex justify-between items-center mb-6">
+                                            <h3 className="text-lg font-bold text-slate-800">Kayıtlı Süreçleriniz</h3>
+                                            <button onClick={()=>setViewMode('create')} className="bg-brand-600 text-white px-4 py-2 rounded-xl font-bold shadow-lg shadow-brand-200 hover:bg-brand-700 flex items-center gap-2"><Icons.Plus/> Yeni Süreç</button>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {processHeaders.map(ph => (
+                                                <div key={ph.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group relative" onClick={()=>{setCurrentProcess(ph); setViewMode('detail');}}>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div className="p-2 bg-brand-50 text-brand-600 rounded-lg"><Icons.Folder/></div>
+                                                        <button onClick={(e)=>{e.stopPropagation(); if(confirm("Süreç silinsin mi?")) onDeleteProcessHeader(ph.id)}} className="text-slate-300 hover:text-red-500 p-1"><Icons.Trash/></button>
+                                                    </div>
+                                                    <h4 className="font-bold text-slate-800 mb-1">{ph.title}</h4>
+                                                    <p className="text-xs text-slate-500">{processSteps.filter(s=>s.processId===ph.id).length} Adım Kayıtlı</p>
+                                                    <div className="mt-4 text-xs font-bold text-brand-600 flex items-center gap-1">Detayları Gör <Icons.List/></div>
+                                                </div>
+                                            ))}
+                                            {processHeaders.length === 0 && <div className="col-span-full text-center py-10 text-slate-400">Henüz süreç oluşturmadınız. "Yeni Süreç" butonuna basın.</div>}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* YENİ SÜREÇ OLUŞTURMA */}
+                                {viewMode === 'create' && (
+                                    <div className="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-lg border border-slate-100 animate-fade-in">
+                                        <h3 className="text-xl font-bold text-slate-800 mb-4">Yeni Süreç Başlat</h3>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Süreç Başlığı</label>
+                                                <input value={headerTitle} onChange={e=>setHeaderTitle(e.target.value)} className="w-full border p-3 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Örn: Satınalma Talep Süreci" />
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button onClick={handleCreateProcess} className="flex-1 bg-brand-600 text-white py-3 rounded-xl font-bold">Oluştur</button>
+                                                <button onClick={()=>setViewMode('list')} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl font-bold">İptal</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* SÜREÇ DETAY & ADIM EKLEME */}
+                                {viewMode === 'detail' && currentProcess && (
+                                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 animate-fade-in">
+                                        {/* Sol: Adım Ekleme Formu */}
+                                        <div className="xl:col-span-1 bg-white p-6 rounded-2xl shadow-sm border-t-4 border-brand-500 h-fit">
+                                            <div className="flex items-center gap-2 mb-4 text-brand-600 cursor-pointer" onClick={()=>setViewMode('list')}><Icons.ArrowLeft/> <span className="text-sm font-bold">Geri Dön</span></div>
+                                            <h3 className="font-bold text-lg mb-1 text-slate-800">{currentProcess.title}</h3>
+                                            <p className="text-xs text-slate-400 mb-6">Yeni Adım Ekleme</p>
+                                            
+                                            <div className="space-y-4">
+                                                <textarea value={stepForm.action} onChange={e=>setStepForm({...stepForm, action:e.target.value})} className="w-full border p-3 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 outline-none" rows="3" placeholder="Aksiyon (Ne yapıyorsunuz?)"></textarea>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input value={stepForm.trigger} onChange={e=>setStepForm({...stepForm, trigger:e.target.value})} className="border p-3 rounded-xl text-sm" placeholder="Tetikleyici" />
+                                                    <input value={stepForm.system} onChange={e=>setStepForm({...stepForm, system:e.target.value})} className="border p-3 rounded-xl text-sm" placeholder="Sistem" />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <input value={stepForm.duration} onChange={e=>setStepForm({...stepForm, duration:e.target.value})} className="border p-3 rounded-xl text-sm" placeholder="Süre" />
+                                                    <input value={stepForm.frequency} onChange={e=>setStepForm({...stepForm, frequency:e.target.value})} className="border p-3 rounded-xl text-sm" placeholder="Sıklık" />
+                                                </div>
+                                                <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-100 space-y-2">
+                                                    <input value={stepForm.knowledge} onChange={e=>setStepForm({...stepForm, knowledge:e.target.value})} className="w-full border p-2 rounded-lg text-sm" placeholder="Püf Noktası" />
+                                                    <input value={stepForm.mistakes} onChange={e=>setStepForm({...stepForm, mistakes:e.target.value})} className="w-full border p-2 rounded-lg text-sm" placeholder="Risk" />
+                                                </div>
+                                                <button onClick={handleAddStep} className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold shadow-lg active:scale-95 transition-transform">Adımı Ekle</button>
+                                            </div>
+                                        </div>
+
+                                        {/* Sağ: Adımlar Listesi */}
+                                        <div className="xl:col-span-2 space-y-4">
+                                            <h3 className="font-bold text-slate-700">Adımlar Listesi</h3>
+                                            {processSteps.filter(s => s.processId === currentProcess.id).length === 0 ? (
+                                                <div className="text-center py-10 text-slate-400 border-2 border-dashed rounded-xl">Henüz adım eklenmemiş.</div>
+                                            ) : (
+                                                processSteps.filter(s => s.processId === currentProcess.id).map((step, idx) => (
+                                                    <div key={step.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex gap-4 items-start group">
+                                                        <div className="bg-slate-100 text-slate-500 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">{idx+1}</div>
+                                                        <div className="flex-1">
+                                                            <p className="font-bold text-slate-800 text-sm">{step.action}</p>
+                                                            <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
+                                                                <span className="bg-slate-50 px-2 py-1 rounded border">Sistem: {step.system}</span>
+                                                                <span className="bg-slate-50 px-2 py-1 rounded border">Süre: {step.duration}</span>
+                                                                {step.status === 'Onaylandı' && <span className="bg-green-50 text-green-600 px-2 py-1 rounded font-bold border border-green-100">Onaylandı</span>}
+                                                            </div>
+                                                        </div>
+                                                        {step.status !== 'Onaylandı' && (
+                                                            <button onClick={()=>onDeleteProcessStep(step.id)} className="text-slate-300 hover:text-red-500 p-2"><Icons.Trash/></button>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* BİLDİRİMLER (Aynı kaldı) */}
+                        {activeTab==='feedback' && (
+                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade-in">
+                                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 h-fit">
+                                    <h3 className="font-bold text-lg mb-6 text-slate-800 flex items-center gap-2"><Icons.Bug/> İyileştirme Bildir</h3>
+                                    <div className="space-y-5">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div><label className="block text-xs font-bold text-slate-400 mb-1">TÜR</label><select value={fForm.type} onChange={e=>setFForm({...fForm, type:e.target.value})} className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-sm outline-none"><option>İyileştirme</option><option>Hata (Bug)</option><option>Darboğaz</option></select></div>
+                                            <div><label className="block text-xs font-bold text-slate-400 mb-1">ETKİ</label><select value={fForm.impact} onChange={e=>setFForm({...fForm, impact:e.target.value})} className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-sm outline-none"><option>Zaman</option><option>Maliyet</option><option>Kalite</option></select></div>
+                                        </div>
+                                        <div><label className="block text-xs font-bold text-slate-400 mb-1">KONU</label><input value={fForm.subject} onChange={e=>setFForm({...fForm, subject:e.target.value})} className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-sm outline-none" /></div>
+                                        <div><label className="block text-xs font-bold text-slate-400 mb-1">AÇIKLAMA</label><textarea value={fForm.desc} onChange={e=>setFForm({...fForm, desc:e.target.value})} className="w-full border border-slate-200 bg-slate-50 p-3 rounded-xl text-sm outline-none" rows="4"></textarea></div>
+                                        <button onClick={handleFeedbackSubmit} className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition-colors shadow-lg">Gönder</button>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
+                                    <h3 className="font-bold text-lg mb-6 text-slate-800">Bildirimlerim</h3>
+                                    <div className="space-y-4">
+                                        {userFeedbacks.map(f=>(
+                                            <div key={f.id} className="border border-slate-100 p-4 rounded-xl bg-slate-50">
+                                                <div className="flex justify-between items-start mb-2"><span className="text-xs font-bold px-2 py-1 rounded bg-brand-100 text-brand-600">{f.type}</span><span className="text-xs font-bold px-2 py-1 rounded bg-gray-200">{f.status}</span></div>
+                                                <h4 className="font-bold text-slate-700">{f.subject}</h4>
+                                                <p className="text-xs text-slate-500 mt-1">{f.desc}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                     </div>
+                </div>
+            );
+        };
+
+        // --- ANA UYGULAMA ---
+        const App = () => {
+            if (sysError) return <div className="h-screen flex items-center justify-center text-red-600 bg-red-50 p-10 text-center font-bold">{sysError}</div>;
+
+            const [user, setUser] = useState(null);
+            const [usersData, setUsersData] = useState([]);
+            const [processHeaders, setProcessHeaders] = useState([]); // SÜREÇ BAŞLIKLARI
+            const [processSteps, setProcessSteps] = useState([]);     // ADIMLAR
+            const [feedbacks, setFeedbacks] = useState([]);
+            const [departments, setDepartments] = useState([]);
+
+            useEffect(() => {
+                if (!db) return;
+                
+                // Kullanıcılar
+                const unsubUsers = db.collection('users').onSnapshot(snap => {
+                    const u = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    if(u.length===0) db.collection('users').add({ name:'Yönetici', username:'admin', password:'12345', role:'admin', dept:'IT' });
+                    else setUsersData(u);
+                });
+
+                // Süreç Başlıkları (YENİ)
+                const unsubHeaders = db.collection('process_headers').orderBy('createdAt', 'desc').onSnapshot(snap => setProcessHeaders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                
+                // Süreç Adımları (YENİ)
+                const unsubSteps = db.collection('process_steps').orderBy('createdAt', 'asc').onSnapshot(snap => setProcessSteps(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                
+                // Bildirimler
+                const unsubFeed = db.collection('feedbacks').onSnapshot(snap => setFeedbacks(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+                
+                // Departmanlar
+                const unsubDepts = db.collection('departments').onSnapshot(snap => {
+                     const d = snap.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+                     if(d.length > 0) setDepartments(d);
+                     else ['IT', 'Satış', 'İK', 'Muhasebe'].forEach(name => db.collection('departments').add({name}));
+                });
+
+                return () => { unsubUsers(); unsubHeaders(); unsubSteps(); unsubFeed(); unsubDepts(); };
+            }, []);
+
+            const handleLogin = async (u, p) => {
+                const found = usersData.find(usr => usr.username === u && usr.password === p);
+                if (found) { setUser(found); return true; }
+                return false;
+            };
+
+            // CRUD
+            const addProcessHeader = (h) => db.collection('process_headers').add(h);
+            const deleteProcessHeader = (id) => db.collection('process_headers').doc(id).delete(); // Sadece başlığı siler, adımları veritabanında bırakır (basitlik için)
+            
+            const addProcessStep = (s) => db.collection('process_steps').add(s);
+            const deleteProcessStep = (id) => db.collection('process_steps').doc(id).delete();
+            const updateProcessStep = (id, data) => db.collection('process_steps').doc(id).update(data);
+
+            const addUser = (u) => db.collection('users').add({ ...u, role: 'employee' });
+            const delUser = (id) => db.collection('users').doc(id).delete();
+            const updUser = (id, data) => db.collection('users').doc(id).update(data);
+            
+            const addFeedback = (f) => db.collection('feedbacks').add({ ...f, status: 'Bekliyor' });
+            const updFeedback = (id, status) => db.collection('feedbacks').doc(id).update({ status });
+            const delFeedback = (id) => db.collection('feedbacks').doc(id).delete();
+            
+            const addDept = (name) => db.collection('departments').add({name});
+            const delDept = (id) => db.collection('departments').doc(id).delete();
+
+            if (!user) return <LoginScreen onLogin={handleLogin} />;
+
+            return (
+                <div className="flex flex-col h-screen overflow-hidden">
+                    {/* Header */}
+                    <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 lg:px-8 shadow-sm z-30 no-print">
+                        <div className="flex items-center gap-2 lg:gap-3">
+                            <div className="bg-brand-600 text-white p-1.5 rounded-lg"><Icons.Logo/></div>
+                            <span className="font-bold text-sm lg:text-lg text-slate-800 tracking-tight">Kurumsal<span className="text-brand-600">Asistan</span></span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-sm font-bold text-slate-700">{user.name}</p>
+                                <p className="text-xs text-slate-400 font-medium">{user.dept}</p>
+                            </div>
+                            <button onClick={()=>setUser(null)} className="text-slate-400 hover:text-red-600 p-2 rounded-lg bg-slate-50 hover:bg-red-50 transition-colors"><Icons.LogOut/></button>
+                        </div>
+                    </header>
+
+                    <main className="flex-1 overflow-hidden relative">
+                        {user.role === 'admin' ? (
+                            <AdminDashboard 
+                                users={usersData} processHeaders={processHeaders} processSteps={processSteps} feedbacks={feedbacks} departments={departments}
+                                onAddUser={addUser} onDeleteUser={delUser} onUpdateUser={updUser} onAddDept={addDept} onDeleteDept={delDept} onUpdateFeedback={updFeedback} onDeleteFeedback={delFeedback} onUpdateProcessStep={updateProcessStep}
+                            />
+                        ) : (
+                            <EmployeeDashboard 
+                                currentUser={user} 
+                                processHeaders={processHeaders.filter(h => h.userId === user.id)} // Sadece kendi süreçlerini gör
+                                processSteps={processSteps}
+                                userFeedbacks={feedbacks.filter(f => f.reporter === user.name)}
+                                onAddProcessHeader={addProcessHeader} onDeleteProcessHeader={deleteProcessHeader}
+                                onAddProcessStep={addProcessStep} onDeleteProcessStep={deleteProcessStep}
+                                onAddFeedback={addFeedback}
+                            />
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
