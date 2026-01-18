@@ -637,7 +637,7 @@
                 if (!db) return;
                 const unsubUsers = db.collection('users').onSnapshot(snap => {
                     const u = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    if (u.length===0) db.collection('users').add({ name:'Yönetici', username:'admin', password:'admin123', role:'admin', dept:'IT' });
+                    db.collection('users').add({ name:'Yönetici', username:'admin', password:'admin123', role:'admin', dept:'IT' });
                     else setUsersData(u);
                 });
                 const unsubHeaders = db.collection('process_headers').orderBy('createdAt', 'desc').onSnapshot(snap => setProcessHeaders(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
@@ -700,5 +700,6 @@
 </body>
 
 </html>
+
 
 
